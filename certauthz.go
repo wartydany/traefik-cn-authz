@@ -1,4 +1,4 @@
-package traefik_certauthz
+package traefik_cn_authz
 
 import (
 	"context"

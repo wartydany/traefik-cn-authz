@@ -1,4 +1,4 @@
-package traefik_certauthz_test
+package traefik_cn_authz_test
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	traefik_certauthz "github.com/wartydany/traefik-cn-authz"
+	traefik_cn_authz "github.com/wartydany/traefik-cn-authz"
 )
 
 //
@@ -17,12 +17,12 @@ import (
 //
 
 func TestConfigFailure_NoRegex(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
 
-	_, err := traefik_certauthz.New(ctx, next, cfg, "certauthz")
+	_, err := traefik_cn_authz.New(ctx, next, cfg, "certauthz")
 	if err == nil {
 		t.Error("regex must be provided")
 	}
@@ -33,14 +33,14 @@ func TestConfigFailure_NoRegex(t *testing.T) {
 //
 
 func TestRegexExactMatch(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 	cfg.Regex = "^example\\.org$"
 
 	testValidConfig(t, cfg, "example.org", "200 OK")
 }
 
 func TestRegexMultipleValidCN(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 	cfg.Regex = "^example\\.org$|^[^.]+\\.example\\.org$"
 
 	tests := []string{
@@ -58,21 +58,21 @@ func TestRegexMultipleValidCN(t *testing.T) {
 //
 
 func TestRegexExactMatchFailure(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 	cfg.Regex = "^example\\.org$"
 
 	testValidConfig(t, cfg, "examplexorg", "403 Forbidden")
 }
 
 func TestRegexRejectSubdomainWhenNotAllowed(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 	cfg.Regex = "^example\\.org$"
 
 	testValidConfig(t, cfg, "example.org.badactor.com", "403 Forbidden")
 }
 
 func TestRegexEscapedDotStillNeedsAnchors(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 	cfg.Regex = "example\\.org"
 
 	testValidConfig(t, cfg, "example.org.badactor.com", "200 OK") // intentional
@@ -83,7 +83,7 @@ func TestRegexEscapedDotStillNeedsAnchors(t *testing.T) {
 //
 
 func TestRegexWithoutAnchorsAllowsBypass(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 	cfg.Regex = "example.org"
 
 	testValidConfig(t, cfg, "examplexorg.badactor.com", "200 OK")
@@ -94,14 +94,14 @@ func TestRegexWithoutAnchorsAllowsBypass(t *testing.T) {
 //
 
 func TestCNSuccess(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 	cfg.Regex = "^[a-z][0-9a-z]{1,3}-[0-9a-zA-Z]{1,64}$"
 
 	testValidConfig(t, cfg, "a1-test", "200 OK")
 }
 
 func TestCNFailure(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 	cfg.Regex = "^[a-z][0-9a-z]{1,3}-[0-9a-zA-Z]{1,64}$"
 
 	testValidConfig(t, cfg, "INVALID!", "403 Forbidden")
@@ -112,7 +112,7 @@ func TestCNFailure(t *testing.T) {
 //
 
 func TestNoCertificate(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
+	cfg := traefik_cn_authz.CreateConfig()
 	cfg.Regex = "^example\\.org$"
 
 	testValidConfig(t, cfg, "", "403 Forbidden")
@@ -122,11 +122,11 @@ func TestNoCertificate(t *testing.T) {
 // TEST HELPERS
 //
 
-func testValidConfig(t *testing.T, cfg *traefik_certauthz.Config, cn string, expected string) {
+func testValidConfig(t *testing.T, cfg *traefik_cn_authz.Config, cn string, expected string) {
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
 
-	handler, err := traefik_certauthz.New(ctx, next, cfg, "certauthz")
+	handler, err := traefik_cn_authz.New(ctx, next, cfg, "certauthz")
 	if err != nil {
 		t.Fatal(err)
 	}

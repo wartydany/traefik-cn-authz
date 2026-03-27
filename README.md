@@ -26,9 +26,9 @@ DNS Subject Alternative Names (SANs) are ignored.
 ```yaml
 experimental:
   plugins:
-    certauthz:
+    cn-authz:
       moduleName: "github.com/wartydany/traefik-cn-authz"
-      version: "v0.4.0"
+      version: "v0.4.1"
 ```
 
 ### Dynamic configuration
@@ -37,7 +37,7 @@ http:
   middlewares:
     my-certauthz:
       plugin:
-        certauthz:
+        cn-authz:
           regex: "^example\.org$"
 # If you forget to use `^` and `$` an attacker would be able to pass with
 # a certificate with a crafted Common Name.
@@ -63,6 +63,23 @@ tls:
           - /etc/ssl/certs/ca-certificates.crt
         clientAuthType: RequireAndVerifyClientCert
 ```
+
+## Or create a Middleware manifest file
+```yaml
+apiVersion: traefik.io/v1alpha1
+kind: Middleware
+metadata:
+  name: cn-validator
+  namespace: my-namespace
+spec:
+  plugin:
+    cn-authz:
+      # IMPORTANT:
+      # The regex is applied to the certificate Common Name (CN).
+      # Always anchor your regex with ^ and $ to avoid bypass.
+      regex: "^[a-z]{1,4}-[0-9a-zA-Z]{1,10}$" # matched against certificate CN
+```
+
 
 ## License
 AGPLv3
