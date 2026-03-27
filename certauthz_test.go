@@ -4,445 +4,163 @@ import (
 	"context"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 
-	// "fmt"
-
-	traefik_certauthz "github.com/wartydany/traefik-certauthz"
+	traefik_certauthz "github.com/wartydany/traefik-cn-authz"
 )
 
-// Config failures
-func TestConfigFailure1(t *testing.T) {
+//
+// CONFIG
+//
+
+func TestConfigFailure_NoRegex(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.org",
-	}
-	cfg.Regex = "^example[.]org$"
-	
+
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
-	
+
 	_, err := traefik_certauthz.New(ctx, next, cfg, "certauthz")
 	if err == nil {
-		t.Error("Expected config failure (both domain and regex configured), but succeeded")
+		t.Error("regex must be provided")
 	}
 }
 
-func TestConfigFailure2(t *testing.T) {
+//
+// REGEX - VALID CASES
+//
+
+func TestRegexExactMatch(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	ctx := context.Background()
-	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
-	
-	_, err := traefik_certauthz.New(ctx, next, cfg, "certauthz")
-	if err == nil {
-		t.Error("Expected config failure (neither domain nor regex configured), but succeeded")
-	}
+	cfg.Regex = "^example\\.org$"
+
+	testValidConfig(t, cfg, "example.org", "200 OK")
 }
 
-// Domain successes
-func TestCertauthzDomainsSuccess1(t *testing.T) {
+func TestRegexMultipleValidCN(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
+	cfg.Regex = "^example\\.org$|^[^.]+\\.example\\.org$"
+
+	tests := []string{
 		"example.org",
-	}
-	sans := []string{
-		"example.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-func TestCertauthzDomainsSuccess2(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.org",
-		"example.com",
-	}
-	sans := []string{
-		"example.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-func TestCertauthzDomainsSuccess3(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.org",
-	}
-	sans := []string{
-		"example.org",
-		"example.com",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-func TestCertauthzDomainsSuccess4(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"eXamp1e.org",
-		"example.net",
-	}
-	sans := []string{
-		"examp1e.org",
-		"example.edu",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-// TODO: implement wildcard SANs with proper checks for bad input
-// func TestCertauthzDomainsSuccess5(t *testing.T) {
-// 	cfg := traefik_certauthz.CreateConfig()
-// 	cfg.Domains = []string{
-// 		"sub.example.org",
-// 	}
-// 	sans := []string{
-// 		"*.example.org",
-// 	}
-// 	testValidConfig(t, cfg, sans, "200 OK")
-// }
-
-// Domain failures
-func TestCertauthzDomainsFailure1(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.org",
-	}
-	
-	testValidConfig(t, cfg, nil, "403 Forbidden")
-}
-
-func TestCertauthzDomainsFailure2(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.org",
-	}
-	sans := []string{
-		"example.com",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-func TestCertauthzDomainsFailure3(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.org",
-		"example.net",
-	}
-	sans := []string{
-		"example.com",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-func TestCertauthzDomainsFailure4(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.org",
-		"example.net",
-	}
-	sans := []string{
-		"example.com",
-		"example.edu",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-func TestCertauthzDomainsFailure5(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.org",
-	}
-	sans := []string{
-		"example.org.badactor.com",
-		"sub.example.org.badactor.com",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-func TestCertauthzDomainsFailure6(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.org",
-	}
-	sans := []string{
-		"examplexorg.badactor.com",
-		"sub.examplexorg.badactor.com",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-// Wildcard domain successes
-func TestCertauthzWildcardDomainsSuccess1(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"*.example.org",
-	}
-	sans := []string{
-		"*.example.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-func TestCertauthzWildcardDomainsSuccess2(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"*.example.org",
-	}
-	sans := []string{
-		"example.org",
-		"*.example.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-func TestCertauthzWildcardDomainsSuccess3(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"*.example.org",
-		"example.com",
-	}
-	sans := []string{
-		"example.org",
-		"*.example.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-func TestCertauthzWildcardDomainsSuccess4(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"*.example.org",
-		"example.com",
-	}
-	sans := []string{
 		"sub.example.org",
 	}
-	testValidConfig(t, cfg, sans, "200 OK")
+
+	for _, cn := range tests {
+		testValidConfig(t, cfg, cn, "200 OK")
+	}
 }
 
-func TestCertauthzWildcardDomainsSuccess5(t *testing.T) {
+//
+// REGEX - FAILURE CASES
+//
+
+func TestRegexExactMatchFailure(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"example.*",
-	}
-	sans := []string{
-		"example.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
+	cfg.Regex = "^example\\.org$"
+
+	testValidConfig(t, cfg, "examplexorg", "403 Forbidden")
 }
 
-func TestCertauthzWildcardDomainsSuccess6(t *testing.T) {
+func TestRegexRejectSubdomainWhenNotAllowed(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	// TODO: don't allow this, change test and document breaking change
-	// require * to be followed by .
-	cfg.Domains = []string{
-		"exam*ple.org",
-	}
-	sans := []string{
-		"examqwerple.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
+	cfg.Regex = "^example\\.org$"
+
+	testValidConfig(t, cfg, "example.org.badactor.com", "403 Forbidden")
 }
 
-func TestCertauthzWildcardDomainsSuccess7(t *testing.T) {
+func TestRegexEscapedDotStillNeedsAnchors(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	// TODO: don't allow this, change test and document breaking change
-	// require * to be followed by .
-	cfg.Domains = []string{
-		"*example.org",
-	}
-	sans := []string{
-		"badactorexample.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
+	cfg.Regex = "example\\.org"
+
+	testValidConfig(t, cfg, "example.org.badactor.com", "200 OK") // intentional
 }
 
-// Wildcard domain failures
-func TestCertauthzWildcardDomainsFailure1(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"*.example.org",
-	}
-	sans := []string{
-		"example.org",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
+//
+// REGEX - UNSAFE CONFIGURATION (DOCUMENTED BEHAVIOR)
+//
 
-func TestCertauthzWildcardDomainsFailure2(t *testing.T) {
+func TestRegexWithoutAnchorsAllowsBypass(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"*.example.org",
-	}
-	sans := []string{
-		"sub.example.com",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-func TestCertauthzWildcardDomainsFailure3(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"*.example.org",
-	}
-	sans := []string{
-		"sub.sub.example.org",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-func TestCertauthzWildcardDomainsFailure4(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Domains = []string{
-		"*.example.org",
-	}
-	sans := []string{
-		"*.example.com",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-func TestCertauthzWildcardDomainsFailure5(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	// TODO: don't allow this, change test and document breaking change
-	// require * to be followed by .
-	cfg.Domains = []string{
-		"exam*ple.org",
-	}
-	sans := []string{
-		"example.org",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-// Regex successes
-func TestCertauthzRegexSuccess1(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Regex = "^example[.]org$"
-	sans := []string{
-		"example.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-func TestCertauthzRegexSuccess2(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Regex = "^example[.]org$|^[^.]+.example.org$"
-	sans := []string{
-		"sub.example.org",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-func TestCertauthzRegexSuccess3(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Regex = "^example[.]org$|^[^.]+.example.org$"
-	sans := []string{
-		"example.org",
-		"sub.example.com",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
-}
-
-func TestCertauthzRegexSuccess4(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	// TODO: add a warning for not enclosing in ^$, change test to expect it
 	cfg.Regex = "example.org"
-	sans := []string{
-		"example.org.badactor.com",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
+
+	testValidConfig(t, cfg, "examplexorg.badactor.com", "200 OK")
 }
 
-func TestCertauthzRegexSuccess5(t *testing.T) {
+//
+// CN VALIDATION
+//
+
+func TestCNSuccess(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	// TODO: add a warning for not enclosing in ^$, change test to expect it
-	cfg.Regex = "example.org"
-	sans := []string{
-		"examplexorg.badactor.com",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
+	cfg.Regex = "^[a-z][0-9a-z]{1,3}-[0-9a-zA-Z]{1,64}$"
+
+	testValidConfig(t, cfg, "a1-test", "200 OK")
 }
 
-func TestCertauthzRegexSuccess6(t *testing.T) {
+func TestCNFailure(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	// TODO: add a warning for not enclosing in ^$, change test to expect it
-	cfg.Regex = "example.org"
-	sans := []string{
-		"examplexorg",
-	}
-	testValidConfig(t, cfg, sans, "200 OK")
+	cfg.Regex = "^[a-z][0-9a-z]{1,3}-[0-9a-zA-Z]{1,64}$"
+
+	testValidConfig(t, cfg, "INVALID!", "403 Forbidden")
 }
 
-// Regex failures
-func TestCertauthzRegexFailure1(t *testing.T) {
+//
+// NO CERT CASE
+//
+
+func TestNoCertificate(t *testing.T) {
 	cfg := traefik_certauthz.CreateConfig()
-	cfg.Regex = "^example[.]org$"
-	sans := []string{
-		"examplexorg",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
+	cfg.Regex = "^example\\.org$"
+
+	testValidConfig(t, cfg, "", "403 Forbidden")
 }
 
-func TestCertauthzRegexFailure2(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Regex = "^example[.]org$"
-	sans := []string{
-		"example.org.badactor.com",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
+//
+// TEST HELPERS
+//
 
-func TestCertauthzRegexFailure3(t *testing.T) {
-	cfg := traefik_certauthz.CreateConfig()
-	cfg.Regex = "^example[.]org$"
-	sans := []string{
-		"example.org.badactor.com",
-	}
-	testValidConfig(t, cfg, sans, "403 Forbidden")
-}
-
-
-func testValidConfig(t *testing.T, cfg *traefik_certauthz.Config, sans []string, expected string) {
+func testValidConfig(t *testing.T, cfg *traefik_certauthz.Config, cn string, expected string) {
 	ctx := context.Background()
 	next := http.HandlerFunc(func(rw http.ResponseWriter, req *http.Request) {})
-	
+
 	handler, err := traefik_certauthz.New(ctx, next, cfg, "certauthz")
 	if err != nil {
 		t.Fatal(err)
 	}
-	
+
 	recorder := httptest.NewRecorder()
-	
+
 	req, err := http.NewRequestWithContext(ctx, http.MethodGet, "http://localhost", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	
-	if sans != nil {
-		cert := createCertificate(sans)
+
+	if cn != "" {
+		cert := createCertificate(cn)
 		req.TLS = createTLSConnectionState(cert)
 	}
-	
+
 	handler.ServeHTTP(recorder, req)
 	res := recorder.Result()
-	
-	// fmt.Println(res)
-	
+
 	if res.Status != expected {
-		t.Errorf("Expected Status '%s', got '%s'", expected, res.Status)
+		t.Errorf("expected status '%s', got '%s'", expected, res.Status)
 	}
 }
 
 func createTLSConnectionState(cert *x509.Certificate) *tls.ConnectionState {
-	return &tls.ConnectionState {
+	return &tls.ConnectionState{
 		PeerCertificates: []*x509.Certificate{cert},
 	}
 }
 
-func createCertificate(sans []string) *x509.Certificate {
-	return &x509.Certificate {
-		DNSNames: sans,
+func createCertificate(cn string) *x509.Certificate {
+	return &x509.Certificate{
+		Subject: pkix.Name{
+			CommonName: cn,
+		},
 	}
 }

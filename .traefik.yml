@@ -1,10 +1,8 @@
-displayName: Client Certificate Authorization Plugin
-summary: "Authorize requests based on the TLS client certificate"
+displayName: Client Certificate CN Authorization
+summary: Authorize requests based on the TLS client certificate Common Name (CN)
 type: middleware
 
-import: github.com/wartydany/traefik-certauthz
+import: github.com/wartydany/traefik-cn-authz
 
 testData:
-  domains:
-    - "example.org"
-    - "*.example.net"
+  regex: "^example\\.org$"
