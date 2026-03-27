@@ -16,7 +16,7 @@ to also validate the certificate against a CA that you specify.
 experimental:
   plugins:
     certauthz:
-      moduleName: "github.com/famedly/traefik-certauthz"
+      moduleName: "github.com/wartydany/traefik-certauthz"
       version: "v0.1.0"
 ```
 

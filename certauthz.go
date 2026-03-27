@@ -3,8 +3,8 @@ package traefik_certauthz
 import (
 	"context"
 	"fmt"
-	"regexp"
 	"net/http"
+	"regexp"
 	"strings"
 )
 
@@ -67,13 +67,12 @@ func New(ctx context.Context, next http.Handler, config *Config, name string) (h
 func (a *CertAuthz) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
 	if req.TLS != nil && len(req.TLS.PeerCertificates) != 0 {
 		var cert = req.TLS.PeerCertificates[0] // leaf certificate
-		for _, name := range cert.DNSNames {
-			if a.regex.MatchString(name) {
-				a.next.ServeHTTP(rw, req)
-				return
-			}
-		}
+		var cn = cert.Subject.CommonName
+        if a.regex.MatchString(cn) {
+            a.next.ServeHTTP(rw, req)
+            return
+        }
 	}
-	http.Error(rw, "No matching DNSNames", http.StatusForbidden)
+	http.Error(rw, "CN does not match", http.StatusForbidden)
 	return
 }

@@ -7,7 +7,7 @@ stages:
 go_test:
   image: "$GO_IMAGE"
   tags:
-    - famedly
+    - wartydany
     - docker
   variables:
     GO_IMAGE: "docker.io/library/golang:1.19-bullseye"

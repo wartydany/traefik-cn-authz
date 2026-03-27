@@ -1,3 +1,3 @@
-module github.com/famedly/traefik-certauthz
+module github.com/wartydany/traefik-certauthz
 
-go 1.19
+go 1.26

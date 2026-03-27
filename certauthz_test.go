@@ -7,9 +7,10 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
 	// "fmt"
 
-	"github.com/famedly/traefik-certauthz"
+	traefik_certauthz "github.com/wartydany/traefik-certauthz"
 )
 
 // Config failures
