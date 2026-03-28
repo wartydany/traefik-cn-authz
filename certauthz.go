@@ -51,5 +51,5 @@ func (a *CertAuthz) ServeHTTP(rw http.ResponseWriter, req *http.Request) {
             return
         }
 	}
-	http.Error(rw, "client certificate CN does not match", http.StatusForbidden)
+	http.Error(rw, fmt.Sprintf("client certificate CN does not match regexpr: %s", a.regex.String()), http.StatusForbidden)
 }
